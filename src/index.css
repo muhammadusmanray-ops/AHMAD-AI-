@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@keyframes morph {
+  0% {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+    transform: rotate(0deg);
+  }
+  50% {
+    border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+    transform: rotate(180deg);
+  }
+  100% {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 0 40px rgba(99, 102, 241, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(236, 72, 153, 0.6), 0 0 70px rgba(16, 185, 129, 0.3);
+  }
+}
+
+.hud-blob {
+  animation: morph 8s ease-in-out infinite alternate;
+}
+
+.hud-blob-slow {
+  animation: morph 12s ease-in-out infinite alternate-reverse;
+}
+
+.hud-glow-rotate {
+  animation: pulseGlow 6s ease-in-out infinite;
+}

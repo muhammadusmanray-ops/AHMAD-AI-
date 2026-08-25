@@ -1,0 +1,10 @@
+{
+  "name": "Gemini Live Voice Assistant",
+  "description": "Real-time, ultra-low latency voice assistant powered by Google Gemini Live API with natural human-like voices and live audio visualization.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
