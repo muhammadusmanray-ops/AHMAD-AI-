@@ -1184,7 +1184,37 @@ export default function App() {
                 },
                 systemInstruction: {
                   parts: [{ text: systemInstruction + timeContext }]
-                }
+                },
+                tools: [
+                  {
+                    functionDeclarations: [
+                      {
+                        name: "play_quran",
+                        description: "Starts playing Quran surah recitation",
+                        parameters: {
+                          type: "OBJECT",
+                          properties: {
+                            surah_number: { type: "INTEGER", description: "Surah number from 1 to 114" },
+                            qari_name: { type: "STRING", description: "Optional reciter name" }
+                          },
+                          required: ["surah_number"]
+                        }
+                      },
+                      {
+                        name: "get_hadith",
+                        description: "Fetches authentic Hadith with Sunnah.com reference",
+                        parameters: {
+                          type: "OBJECT",
+                          properties: {
+                            book_name: { type: "STRING", description: "Book name like bukhari, muslim, tirmidhi" },
+                            hadith_number: { type: "INTEGER", description: "Hadith number" }
+                          },
+                          required: ["book_name", "hadith_number"]
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }));
 
@@ -1213,9 +1243,10 @@ export default function App() {
             }
           };
 
-          directWs.onmessage = (evt) => {
+          directWs.onmessage = async (evt) => {
             try {
               const msg = JSON.parse(evt.data);
+              
               if (msg.serverContent?.modelTurn?.parts) {
                 for (const part of msg.serverContent.modelTurn.parts) {
                   if (part.inlineData?.data) {
@@ -1225,17 +1256,98 @@ export default function App() {
                   if (part.text) {
                     setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
                     addTelemetryLog("ai", part.text);
+                    const txtLower = part.text.toLowerCase();
+                    if (txtLower.includes("stop") || txtLower.includes("pause") || txtLower.includes("roko")) {
+                      stopQuranAudio();
+                    }
+                  }
+                }
+              }
+
+              if (msg.serverContent?.turnComplete) {
+                setLiveAssistantText((currentLiveText) => {
+                  if (currentLiveText) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `asst-${Date.now()}`,
+                        role: "assistant",
+                        text: currentLiveText,
+                        timestamp: Date.now(),
+                      },
+                    ]);
+                  }
+                  return "";
+                });
+                if (assistantState !== "muted") {
+                  setAssistantState("listening");
+                }
+              }
+
+              if (msg.serverContent?.interrupted) {
+                playerRef.current?.interrupt();
+                stopQuranAudio();
+                if (assistantState !== "muted") {
+                  setAssistantState("listening");
+                }
+              }
+
+              // Handle Direct Cloud Tool Calls
+              if (msg.toolCall?.functionCalls) {
+                for (const call of msg.toolCall.functionCalls) {
+                  addTelemetryLog("tool", `Gemini Direct Cloud Tool Call: ${call.name}`);
+                  if (call.name === "play_quran") {
+                    const surahNum = Number(call.args?.surah_number) || 67;
+                    playSurahAudio(surahNum, selectedReciterRef.current);
+                    triggerStatusBadge(`PLAYING SURAH ${surahNum}`, "info", 4000);
+                  } else if (call.name === "get_hadith") {
+                    const bookName = String(call.args?.book_name || "bukhari").toLowerCase();
+                    const hadithNum = Number(call.args?.hadith_number) || 1;
+                    try {
+                      const editionsMap: Record<string, string> = {
+                        bukhari: "urdu-lahore",
+                        muslim: "urdu-abdulbaqi",
+                        tirmidhi: "urdu-tirmidhi",
+                        abudawud: "urdu-abudawud",
+                        nasai: "urdu-nasai",
+                        ibnmajah: "urdu-ibnmajah"
+                      };
+                      const edition = editionsMap[bookName] || "urdu-lahore";
+                      const hadithRes = await fetch(`https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions/${edition}/hadiths/${hadithNum}.json`);
+                      const hadithData = await hadithRes.json();
+                      const hadithText = hadithData.hadiths?.[0]?.text || "Hadith text found.";
+                      setIsChatboxOpen(true);
+                      setMessages((prev) => [
+                        ...prev,
+                        {
+                          id: `hadith-${Date.now()}`,
+                          role: "assistant",
+                          text: `Bismillahi-r-Rahmani-r-Rahim. Here is the requested Hadith:`,
+                          timestamp: Date.now(),
+                          hadith: {
+                            book_name: bookName.toUpperCase(),
+                            hadith_number: hadithNum,
+                            text: hadithText,
+                            reference: `${bookName.toUpperCase()} #${hadithNum}`,
+                            verification_url: `https://sunnah.com/${bookName}:${hadithNum}`
+                          }
+                        }
+                      ]);
+                      triggerStatusBadge("HADITH RETRIEVED", "info", 4000);
+                    } catch (hErr) {
+                      console.error("Direct Hadith fetch error:", hErr);
+                    }
                   }
                 }
               }
             } catch (parseErr) {
-              console.error("Direct WS message error:", parseErr);
+              console.error("Direct WS message parse error:", parseErr);
             }
           };
 
           directWs.onerror = (dErr) => {
             console.error("Direct Gemini Cloud WS error:", dErr);
-            setErrorMessage("Direct Gemini Cloud connection error. Please verify VITE_GEMINI_API_KEY in Vercel.");
+            setErrorMessage("Direct Gemini Cloud connection error. Please verify VITE_GEMINI_API_KEY.");
             setAssistantState("error");
           };
 
