@@ -879,7 +879,8 @@ export default function App() {
       playerRef.current?.init();
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/live-ws`;
+      const defaultWsUrl = `${protocol}//${window.location.host}/live-ws`;
+      const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
