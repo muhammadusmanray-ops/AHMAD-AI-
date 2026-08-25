@@ -1137,10 +1137,117 @@ export default function App() {
       };
 
       ws.onerror = (err) => {
-        console.error("%c[JARVIS WS CONNECTION ERROR] ❌", "color: #ef4444; font-weight: bold; font-size: 14px;", err);
-        setErrorMessage("WebSocket connection error. Check server logs.");
-        setAssistantState("error");
-        addTelemetryLog("system", "❌ WebSocket connection error. Please verify backend server.ts is running.");
+        console.warn("%c[JARVIS WS CONNECTION NOTICE] ℹ️ Local WebSocket server not detected (or running on Vercel Serverless). Switching to Direct Gemini Cloud Mode...", "color: #3b82f6; font-weight: bold;", err);
+        addTelemetryLog("system", "ℹ️ Local WebSocket server unavailable. Activating Direct Gemini 2.5 Cloud connection...");
+        
+        // Fallback: Direct Client-to-Gemini Connection for 100% Standalone Vercel Deployment
+        const cloudApiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (window as any).GEMINI_API_KEY;
+        if (!cloudApiKey) {
+          setErrorMessage("Vercel Permanent Mode: Please set VITE_GEMINI_API_KEY in Vercel Environment Variables to activate 24/7 direct cloud mode!");
+          setAssistantState("error");
+          return;
+        }
+
+        try {
+          const directWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${cloudApiKey}`;
+          const directWs = new WebSocket(directWsUrl);
+          wsRef.current = directWs;
+
+          directWs.onopen = async () => {
+            console.log("%c[DIRECT GEMINI LIVE] 🚀 Direct Cloud WebSocket connected to Google Gemini!", "color: #10b981; font-weight: bold;");
+            setStatusMessage("Gemini Live Active (Direct Cloud Mode)");
+            addTelemetryLog("system", "Direct Gemini Cloud session initiated.");
+
+            const now = new Date();
+            const activePrayerTimes = prayerTimesRef.current;
+            let prayerContextStr = "";
+            if (activePrayerTimes && activePrayerTimes.timings) {
+              const nextInfo = getNextPrayerInfo(activePrayerTimes.timings, activePrayerTimes.timezone);
+              prayerContextStr = `\n[PRE-LOADED PRAYER SCHEDULE FOR ${activePrayerTimes.city.toUpperCase()}]\n` +
+                `Fajr: ${activePrayerTimes.timings.Fajr}\nDhuhr: ${activePrayerTimes.timings.Dhuhr}\nAsr: ${activePrayerTimes.timings.Asr}\nMaghrib: ${activePrayerTimes.timings.Maghrib}\nIsha: ${activePrayerTimes.timings.Isha}\n`;
+            }
+
+            const timeContext = `\n\n[SYSTEM CONTEXT]\nCurrent Date & Time: ${now.toLocaleString()}\n${prayerContextStr}\n`;
+
+            directWs.send(JSON.stringify({
+              setup: {
+                model: "models/gemini-2.5-flash-native-audio-latest",
+                generationConfig: {
+                  responseModalities: ["AUDIO"],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: {
+                        voiceName: selectedVoice || "Puck"
+                      }
+                    }
+                  }
+                },
+                systemInstruction: {
+                  parts: [{ text: systemInstruction + timeContext }]
+                }
+              }
+            }));
+
+            try {
+              const recorder = new AudioRecorder((base64Pcm16k) => {
+                if (directWs.readyState === WebSocket.OPEN) {
+                  directWs.send(JSON.stringify({
+                    realtimeInput: {
+                      mediaChunks: [{
+                        mimeType: "audio/pcm;rate=16000",
+                        data: base64Pcm16k
+                      }]
+                    }
+                  }));
+                }
+              });
+              await recorder.start();
+              recorderRef.current = recorder;
+              setAssistantState("listening");
+              setStatusMessage("Ahmed AI Active (Direct Cloud) - Speak freely!");
+              triggerStatusBadge("AHMED AI ONLINE (DIRECT)", "listening", 4000);
+              addTelemetryLog("system", "Microphone streaming directly to Gemini Cloud.");
+            } catch (mErr: any) {
+              setErrorMessage("Microphone access error: " + (mErr?.message || mErr));
+              setAssistantState("error");
+            }
+          };
+
+          directWs.onmessage = (evt) => {
+            try {
+              const msg = JSON.parse(evt.data);
+              if (msg.serverContent?.modelTurn?.parts) {
+                for (const part of msg.serverContent.modelTurn.parts) {
+                  if (part.inlineData?.data) {
+                    playerRef.current?.playChunk(part.inlineData.data);
+                    setAssistantState("speaking");
+                  }
+                  if (part.text) {
+                    setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
+                    addTelemetryLog("ai", part.text);
+                  }
+                }
+              }
+            } catch (parseErr) {
+              console.error("Direct WS message error:", parseErr);
+            }
+          };
+
+          directWs.onerror = (dErr) => {
+            console.error("Direct Gemini Cloud WS error:", dErr);
+            setErrorMessage("Direct Gemini Cloud connection error. Please verify VITE_GEMINI_API_KEY in Vercel.");
+            setAssistantState("error");
+          };
+
+          directWs.onclose = () => {
+            setAssistantState("idle");
+          };
+
+        } catch (dEx: any) {
+          console.error("Direct connection exception:", dEx);
+          setErrorMessage("Failed to initiate Direct Gemini Cloud connection.");
+          setAssistantState("error");
+        }
       };
 
       ws.onclose = (event) => {
