@@ -878,11 +878,176 @@ export default function App() {
     try {
       playerRef.current?.init();
 
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      let defaultWsUrl = `${protocol}//${window.location.host}/live-ws`;
-      if (window.location.hostname.includes("vercel.app") || window.location.hostname.includes("streamlit.app") || window.location.hostname.includes("hf.space")) {
-        defaultWsUrl = "wss://hewjdewjdbqwjdwej-ahmadai.hf.space/proxy/8000/live-ws";
+      const cloudApiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (window as any).GEMINI_API_KEY;
+      const isCloudEnv = window.location.hostname.includes("vercel.app") || window.location.hostname.includes("streamlit.app") || window.location.hostname.includes("hf.space");
+      
+      if (isCloudEnv && cloudApiKey) {
+        addTelemetryLog("system", "🚀 Connecting directly to Gemini 2.0 Live Cloud...");
+        const directWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${cloudApiKey}`;
+        const ws = new WebSocket(directWsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = async () => {
+          console.log("Direct Gemini Live WebSocket connected");
+          setStatusMessage("Ahmed AI Online (Gemini Live Cloud)");
+          addTelemetryLog("system", "✅ Connected to Ahmed AI Voice Engine (Gemini Live Cloud).");
+
+          const now = new Date();
+          const activePrayerTimes = prayerTimesRef.current;
+          let prayerContextStr = "";
+          if (activePrayerTimes && activePrayerTimes.timings) {
+            const nextInfo = getNextPrayerInfo(activePrayerTimes.timings, activePrayerTimes.timezone);
+            prayerContextStr = `\n[TODAY'S PRE-LOADED PRAYER SCHEDULE FOR ${activePrayerTimes.city.toUpperCase()}]\n` +
+              `Fajr: ${activePrayerTimes.timings.Fajr}\nDhuhr: ${activePrayerTimes.timings.Dhuhr}\nAsr: ${activePrayerTimes.timings.Asr}\nMaghrib: ${activePrayerTimes.timings.Maghrib}\nIsha: ${activePrayerTimes.timings.Isha}\n`;
+          }
+
+          const timeContext = `\n\n[SYSTEM CONTEXT]\nCurrent Date & Time: ${now.toLocaleString()}\n${prayerContextStr}\n`;
+
+          ws.send(JSON.stringify({
+            setup: {
+              model: "models/gemini-2.0-flash-exp",
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName: selectedVoice || "Puck"
+                    }
+                  }
+                }
+              },
+              systemInstruction: {
+                parts: [{ text: systemInstruction + timeContext }]
+              },
+              tools: [
+                {
+                  functionDeclarations: [
+                    {
+                      name: "play_quran",
+                      description: "Starts playing Quran surah recitation",
+                      parameters: {
+                        type: "OBJECT",
+                        properties: {
+                          surah_number: { type: "INTEGER", description: "Surah number from 1 to 114" },
+                          qari_name: { type: "STRING", description: "Optional reciter name" }
+                        },
+                        required: ["surah_number"]
+                      }
+                    },
+                    {
+                      name: "get_hadith",
+                      description: "Fetches authentic Hadith reference",
+                      parameters: {
+                        type: "OBJECT",
+                        properties: {
+                          book_name: { type: "STRING", description: "Book name like bukhari, muslim" },
+                          hadith_number: { type: "INTEGER", description: "Hadith number" }
+                        },
+                        required: ["book_name", "hadith_number"]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }));
+
+          try {
+            const recorder = new AudioRecorder((base64Pcm16k) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                  realtimeInput: {
+                    mediaChunks: [{
+                      mimeType: "audio/pcm;rate=16000",
+                      data: base64Pcm16k
+                    }]
+                  }
+                }));
+              }
+            });
+            await recorder.start();
+            recorderRef.current = recorder;
+            setAssistantState("listening");
+            setStatusMessage("Ahmed AI Active - Speak freely!");
+            triggerStatusBadge("AHMED AI ONLINE", "listening", 4000);
+            addTelemetryLog("system", "Microphone streaming active.");
+          } catch (mErr: any) {
+            setErrorMessage("Microphone access error: " + (mErr?.message || mErr));
+            setAssistantState("error");
+          }
+        };
+
+        ws.onmessage = async (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            const serverContent = msg.serverContent || msg.server_content;
+            const modelTurn = serverContent?.modelTurn || serverContent?.model_turn;
+            const parts = modelTurn?.parts;
+            
+            if (parts && Array.isArray(parts)) {
+              for (const part of parts) {
+                const inlineData = part.inlineData || part.inline_data;
+                if (inlineData?.data) {
+                  playerRef.current?.playChunk(inlineData.data);
+                  setAssistantState("speaking");
+                }
+                if (part.text) {
+                  setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
+                  addTelemetryLog("ai", part.text);
+                }
+              }
+            }
+
+            const turnComplete = serverContent?.turnComplete || serverContent?.turn_complete;
+            if (turnComplete) {
+              setLiveAssistantText((currentLiveText) => {
+                if (currentLiveText) {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `asst-${Date.now()}`,
+                      role: "assistant",
+                      text: currentLiveText,
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }
+                return "";
+              });
+              if (assistantState !== "muted") {
+                setAssistantState("listening");
+              }
+            }
+
+            if (msg.toolCall?.functionCalls) {
+              const functionResponses: any[] = [];
+              for (const call of msg.toolCall.functionCalls) {
+                if (call.name === "play_quran") {
+                  const surahNum = Number(call.args?.surah_number) || 67;
+                  playSurahAudio(surahNum, selectedReciterRef.current);
+                  triggerStatusBadge(`PLAYING SURAH ${surahNum}`, "info", 4000);
+                }
+                if (call.id) {
+                  functionResponses.push({
+                    response: { output: { status: "success" } },
+                    id: call.id
+                  });
+                }
+              }
+              if (functionResponses.length > 0 && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
+              }
+            }
+          } catch (pErr) {
+            console.error("Direct WS parse error:", pErr);
+          }
+        };
+
+        return;
       }
+
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const defaultWsUrl = `${protocol}//${window.location.host}/live-ws`;
       const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

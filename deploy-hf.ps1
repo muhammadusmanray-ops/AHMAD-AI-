@@ -11,6 +11,12 @@ New-Item -ItemType Directory -Path $tempDir | Out-Null
 # Copy compiled files from dist/ directly to the root of temp directory
 Write-Host "Copying files from dist/..." -ForegroundColor Yellow
 Copy-Item -Path (Join-Path $PSScriptRoot "dist\*") -Destination $tempDir -Recurse -Force
+Remove-Item (Join-Path $tempDir "quran-taj-company.pdf") -ErrorAction SilentlyContinue
+
+# Copy app.py and requirements.txt from root
+Write-Host "Copying app.py and requirements.txt..." -ForegroundColor Yellow
+Copy-Item -Path (Join-Path $PSScriptRoot "app.py") -Destination $tempDir -Force
+Copy-Item -Path (Join-Path $PSScriptRoot "requirements.txt") -Destination $tempDir -Force
 
 # Create Hugging Face Static Space README.md metadata
 Write-Host "Creating Hugging Face metadata README.md..." -ForegroundColor Yellow
@@ -20,7 +26,7 @@ title: ahmadai
 emoji: 🌙
 colorFrom: green
 colorTo: green
-sdk: static
+sdk: streamlit
 pinned: false
 ---
 # Ahmed AI - Islamic Voice Assistant Space
