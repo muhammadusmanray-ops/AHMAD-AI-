@@ -1256,6 +1256,7 @@ export default function App() {
                   if (inlineData?.data) {
                     playerRef.current?.playChunk(inlineData.data);
                     setAssistantState("speaking");
+                    addTelemetryLog("system", `🔊 Live Audio Stream: Playing ${inlineData.data.length} bytes PCM`);
                   }
                   if (part.text) {
                     setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
@@ -1263,6 +1264,11 @@ export default function App() {
                     const txtLower = part.text.toLowerCase();
                     if (txtLower.includes("stop") || txtLower.includes("pause") || txtLower.includes("roko")) {
                       stopQuranAudio();
+                    }
+                    // Speech fallback if browser audio context is waiting for click
+                    if (!inlineData?.data && 'speechSynthesis' in window) {
+                      const utter = new SpeechSynthesisUtterance(part.text);
+                      window.speechSynthesis.speak(utter);
                     }
                   }
                 }
