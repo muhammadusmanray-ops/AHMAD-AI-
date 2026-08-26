@@ -889,6 +889,7 @@ export default function App() {
 
         ws.onopen = async () => {
           console.log("Direct Gemini Live WebSocket connected");
+          await playerRef.current?.init();
           setStatusMessage("Ahmed AI Online (Gemini Live Cloud)");
           addTelemetryLog("system", "✅ Connected to Ahmed AI Voice Engine (Gemini Live Cloud).");
 
@@ -991,7 +992,7 @@ export default function App() {
                   playerRef.current?.playChunk(inlineData.data);
                   setAssistantState("speaking");
                 }
-                if (part.text) {
+                if (part.text && !part.text.startsWith("**") && !part.text.includes("Responding to")) {
                   setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
                   addTelemetryLog("ai", part.text);
                 }
