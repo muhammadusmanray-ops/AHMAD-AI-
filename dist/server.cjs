@@ -221,7 +221,7 @@ async function startServer() {
             const ai = getGeminiClient();
             sendToClient({ type: "status", status: "connecting", message: "Connecting to Gemini Live..." });
             liveSessionPromise = ai.live.connect({
-              model: "gemini-2.5-flash",
+              model: "gemini-2.5-flash-native-audio-latest",
               config: {
                 responseModalities: [import_genai.Modality.AUDIO],
                 speechConfig: {
