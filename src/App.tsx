@@ -1294,6 +1294,7 @@ export default function App() {
 
               // Handle Direct Cloud Tool Calls
               if (msg.toolCall?.functionCalls) {
+                const functionResponses: any[] = [];
                 for (const call of msg.toolCall.functionCalls) {
                   addTelemetryLog("tool", `Gemini Direct Cloud Tool Call: ${call.name}`);
                   if (call.name === "play_quran") {
@@ -1338,6 +1339,22 @@ export default function App() {
                       console.error("Direct Hadith fetch error:", hErr);
                     }
                   }
+
+                  if (call.id) {
+                    functionResponses.push({
+                      response: { output: { status: "success" } },
+                      id: call.id
+                    });
+                  }
+                }
+
+                // Send toolResponse back to Gemini Cloud so AI finishes turn and speaks back
+                if (functionResponses.length > 0 && directWs.readyState === WebSocket.OPEN) {
+                  directWs.send(JSON.stringify({
+                    toolResponse: {
+                      functionResponses: functionResponses
+                    }
+                  }));
                 }
               }
             } catch (parseErr) {
