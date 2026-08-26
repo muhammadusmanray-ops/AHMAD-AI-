@@ -254,7 +254,7 @@ async function startServer() {
 
             // Connect to Gemini Live Multimodal Session
             liveSessionPromise = ai.live.connect({
-              model: "gemini-2.5-flash-native-audio-latest",
+              model: "gemini-2.0-flash-exp",
               config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
