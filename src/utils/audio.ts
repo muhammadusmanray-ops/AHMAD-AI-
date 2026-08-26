@@ -111,7 +111,7 @@ export class AudioQueuePlayer {
     }
   }
 
-  public playChunk(base64Audio: string) {
+  public playChunk(audioInput: string | ArrayBuffer) {
     this.init();
     if (this.ctx && this.ctx.state === "suspended") {
       this.ctx.resume();
@@ -119,7 +119,7 @@ export class AudioQueuePlayer {
     if (!this.ctx || !this.gainNode) return;
 
     try {
-      const arrayBuffer = base64ToArrayBuffer(base64Audio);
+      const arrayBuffer = typeof audioInput === "string" ? base64ToArrayBuffer(audioInput) : audioInput;
       const float32Data = pcm16ToFloat32(arrayBuffer);
       if (float32Data.length === 0) return;
 

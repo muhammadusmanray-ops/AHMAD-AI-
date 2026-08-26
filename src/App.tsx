@@ -980,7 +980,25 @@ export default function App() {
 
         ws.onmessage = async (evt) => {
           try {
-            const msg = JSON.parse(evt.data);
+            if (evt.data instanceof Blob) {
+              const arrayBuf = await evt.data.arrayBuffer();
+              addTelemetryLog("system", `🔊 Live Audio binary blob received (${arrayBuf.byteLength} bytes)`);
+              playerRef.current?.playChunk(arrayBuf);
+              setAssistantState("speaking");
+              return;
+            }
+            if (evt.data instanceof ArrayBuffer) {
+              addTelemetryLog("system", `🔊 Live Audio binary arraybuffer received (${evt.data.byteLength} bytes)`);
+              playerRef.current?.playChunk(evt.data);
+              setAssistantState("speaking");
+              return;
+            }
+
+            let textData = evt.data;
+            if (typeof textData !== "string") {
+              textData = new TextDecoder().decode(evt.data);
+            }
+            const msg = JSON.parse(textData);
             
             if (msg.setupComplete) {
               addTelemetryLog("system", "⚙️ Setup complete. Gemini 2.5 Flash Live Engine active.");
