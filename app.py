@@ -8,7 +8,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Seamless full-screen CSS to display our exact custom UI
+# Seamless full-screen CSS
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;}
@@ -19,13 +19,15 @@ st.markdown("""
         margin: 0rem !important;
         max-width: 100% !important;
     }
-    iframe {
-        width: 100% !important;
-        height: 100vh !important;
-        border: none !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Render exact custom Ahmed AI React Frontend
-components.iframe("https://ahmad-ai-ivory.vercel.app", height=950, scrolling=True)
+# Embed with explicit Microphone and Autoplay permissions
+components.html("""
+<iframe 
+    src="https://ahmad-ai-ivory.vercel.app" 
+    style="position:fixed; top:0; left:0; bottom:0; right:0; width:100%; height:100%; border:none; margin:0; padding:0; overflow:hidden; z-index:999999;"
+    allow="microphone; camera; autoplay; clipboard-write; encrypted-media; speaker; display-capture"
+    allowfullscreen>
+</iframe>
+""", height=950, scrolling=False)
