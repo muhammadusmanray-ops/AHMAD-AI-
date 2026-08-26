@@ -1246,11 +1246,15 @@ export default function App() {
           directWs.onmessage = async (evt) => {
             try {
               const msg = JSON.parse(evt.data);
+              const serverContent = msg.serverContent || msg.server_content;
+              const modelTurn = serverContent?.modelTurn || serverContent?.model_turn;
+              const parts = modelTurn?.parts;
               
-              if (msg.serverContent?.modelTurn?.parts) {
-                for (const part of msg.serverContent.modelTurn.parts) {
-                  if (part.inlineData?.data) {
-                    playerRef.current?.playChunk(part.inlineData.data);
+              if (parts && Array.isArray(parts)) {
+                for (const part of parts) {
+                  const inlineData = part.inlineData || part.inline_data;
+                  if (inlineData?.data) {
+                    playerRef.current?.playChunk(inlineData.data);
                     setAssistantState("speaking");
                   }
                   if (part.text) {
@@ -1264,7 +1268,8 @@ export default function App() {
                 }
               }
 
-              if (msg.serverContent?.turnComplete) {
+              const turnComplete = serverContent?.turnComplete || serverContent?.turn_complete;
+              if (turnComplete) {
                 setLiveAssistantText((currentLiveText) => {
                   if (currentLiveText) {
                     setMessages((prev) => [
@@ -1284,7 +1289,8 @@ export default function App() {
                 }
               }
 
-              if (msg.serverContent?.interrupted) {
+              const interrupted = serverContent?.interrupted;
+              if (interrupted) {
                 playerRef.current?.interrupt();
                 stopQuranAudio();
                 if (assistantState !== "muted") {
