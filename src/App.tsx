@@ -905,7 +905,7 @@ export default function App() {
 
           ws.send(JSON.stringify({
             setup: {
-              model: "models/gemini-2.0-flash-exp",
+              model: "models/gemini-2.5-flash",
               generationConfig: {
                 responseModalities: ["AUDIO"],
                 speechConfig: {
@@ -1339,7 +1339,7 @@ export default function App() {
 
             directWs.send(JSON.stringify({
               setup: {
-                model: "models/gemini-2.0-flash-exp",
+                model: "models/gemini-2.5-flash",
                 generationConfig: {
                   responseModalities: ["AUDIO"],
                   speechConfig: {

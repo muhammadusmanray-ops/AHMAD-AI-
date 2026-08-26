@@ -47,7 +47,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Send setup frame
             setup_frame = {
                 "setup": {
-                    "model": "models/gemini-2.0-flash-exp",
+                    "model": "models/gemini-2.5-flash",
                     "generationConfig": {
                         "responseModalities": ["AUDIO"],
                         "speechConfig": {
