@@ -981,6 +981,11 @@ export default function App() {
         ws.onmessage = async (evt) => {
           try {
             const msg = JSON.parse(evt.data);
+            
+            if (msg.setupComplete) {
+              addTelemetryLog("system", "⚙️ Setup complete. Gemini 2.5 Flash Live Engine active.");
+            }
+
             const serverContent = msg.serverContent || msg.server_content;
             const modelTurn = serverContent?.modelTurn || serverContent?.model_turn;
             const parts = modelTurn?.parts;
@@ -989,18 +994,24 @@ export default function App() {
               for (const part of parts) {
                 const inlineData = part.inlineData || part.inline_data;
                 if (inlineData?.data) {
+                  addTelemetryLog("system", `🔊 Live Audio chunk received (${inlineData.data.length} bytes)`);
                   playerRef.current?.playChunk(inlineData.data);
                   setAssistantState("speaking");
                 }
-                if (part.text && !part.text.startsWith("**") && !part.text.includes("Responding to")) {
-                  setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
-                  addTelemetryLog("ai", part.text);
+                if (part.text) {
+                  if (!part.text.startsWith("**") && !part.text.includes("Responding to")) {
+                    setLiveAssistantText((prev) => (prev ? prev + " " + part.text : part.text));
+                    addTelemetryLog("ai", part.text);
+                  } else {
+                    addTelemetryLog("system", `🧠 Model Thought: ${part.text.slice(0, 100)}...`);
+                  }
                 }
               }
             }
 
             const turnComplete = serverContent?.turnComplete || serverContent?.turn_complete;
             if (turnComplete) {
+              addTelemetryLog("system", "✨ Turn complete.");
               setLiveAssistantText((currentLiveText) => {
                 if (currentLiveText) {
                   setMessages((prev) => [
@@ -1023,6 +1034,7 @@ export default function App() {
             if (msg.toolCall?.functionCalls) {
               const functionResponses: any[] = [];
               for (const call of msg.toolCall.functionCalls) {
+                addTelemetryLog("system", `⚡ Executing tool call: ${call.name}`);
                 if (call.name === "play_quran") {
                   const surahNum = Number(call.args?.surah_number) || 67;
                   playSurahAudio(surahNum, selectedReciterRef.current);
@@ -1039,9 +1051,18 @@ export default function App() {
                 ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
               }
             }
-          } catch (pErr) {
+          } catch (pErr: any) {
             console.error("Direct WS parse error:", pErr);
+            addTelemetryLog("system", `❌ WS Parse Error: ${pErr?.message || pErr}`);
           }
+        };
+
+        ws.onerror = (err: any) => {
+          addTelemetryLog("system", `❌ WS Error: ${err?.message || "Connection error"}`);
+        };
+
+        ws.onclose = (evt: CloseEvent) => {
+          addTelemetryLog("system", `⚠️ WS Closed: Code ${evt.code}, Reason: ${evt.reason || 'Normal close'}`);
         };
 
         return;
