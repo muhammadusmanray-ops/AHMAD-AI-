@@ -738,7 +738,8 @@ async function startServer() {
   }
 
   const startListening = (initialPort: number) => {
-    server.listen(initialPort, "0.0.0.0", () => {
+    const host = process.env.IP || "::";
+    server.listen(initialPort, host as any, () => {
       console.log("\n\x1b[36m=======================================================");
       console.log("  🚀 AHMED AI GEMINI LIVE VOICE ASSISTANT SERVER READY!");
       console.log(`  🌐 Local Access: http://localhost:${initialPort}`);
