@@ -879,7 +879,10 @@ export default function App() {
       playerRef.current?.init();
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const defaultWsUrl = `${protocol}//${window.location.host}/live-ws`;
+      let defaultWsUrl = `${protocol}//${window.location.host}/live-ws`;
+      if (window.location.hostname.includes("vercel.app") || window.location.hostname.includes("streamlit.app")) {
+        defaultWsUrl = "wss://ahmadai.alwaysdata.net/live-ws";
+      }
       const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
