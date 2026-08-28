@@ -1171,8 +1171,12 @@ export default function App() {
             } else if (data.status === "disconnected") {
               setAssistantState("idle");
               setStatusMessage(data.message || "Disconnected");
-              addTelemetryLog("system", `Session disconnected: ${data.message}`);
+              addTelemetryLog("system", `⚠️ Session disconnected: ${data.message}`);
             }
+          } else if (data.type === "error") {
+            addTelemetryLog("system", `❌ LIVE API ERROR: ${data.error}`);
+            setErrorMessage(`Live Error: ${data.error}`);
+            setAssistantState("error");
           } else if (data.type === "audio") {
             if (data.audio) {
               addTelemetryLog("system", `🔊 Audio chunk received: ${Math.round(data.audio.length / 1024)}KB`);
