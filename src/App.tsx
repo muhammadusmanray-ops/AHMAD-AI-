@@ -876,7 +876,7 @@ export default function App() {
     addTelemetryLog("system", "Connecting WebSocket gateway...");
 
     try {
-      playerRef.current?.init();
+      await playerRef.current?.unlockAudio();
 
       const cloudApiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || (window as any).GEMINI_API_KEY;
       const isCloudEnv = window.location.hostname.includes("vercel.app") || window.location.hostname.includes("streamlit.app") || window.location.hostname.includes("hf.space");

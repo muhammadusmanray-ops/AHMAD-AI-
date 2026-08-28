@@ -105,6 +105,24 @@ export class AudioQueuePlayer {
     }
   }
 
+  public async unlockAudio() {
+    await this.init();
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") {
+        await this.ctx.resume();
+      }
+      try {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.0001;
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.01);
+      } catch (e) {}
+    }
+  }
+
   public setVolume(volume: number) {
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
