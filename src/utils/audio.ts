@@ -135,6 +135,12 @@ export class AudioQueuePlayer {
         this.nextStartTime = currentTime + 0.005;
       }
 
+      // Smooth 5ms fade-in to eliminate starting static / hiss noise
+      if (this.gainNode.gain.value === 0 || !this.isPlaying) {
+        this.gainNode.gain.setValueAtTime(0.001, currentTime);
+        this.gainNode.gain.linearRampToValueAtTime(1.0, currentTime + 0.005);
+      }
+
       source.start(this.nextStartTime);
       this.activeSources.push(source);
 

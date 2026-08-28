@@ -583,27 +583,14 @@ async function startServer() {
             try {
               const activeSession = liveSession || (liveSessionPromise ? await liveSessionPromise : null);
               if (activeSession) {
-                try {
-                  activeSession.sendRealtimeInput({
-                    media: {
+                activeSession.sendRealtimeInput({
+                  mediaChunks: [
+                    {
                       data: audioBase64,
                       mimeType: "audio/pcm;rate=16000"
                     }
-                  });
-                } catch (e1) {
-                  if (typeof activeSession.send === "function") {
-                    activeSession.send({
-                      realtimeInput: {
-                        mediaChunks: [
-                          {
-                            data: audioBase64,
-                            mimeType: "audio/pcm;rate=16000"
-                          }
-                        ]
-                      }
-                    });
-                  }
-                }
+                  ]
+                });
               }
             } catch (sendErr) {
               console.error("\x1B[31m[CMD AUDIO ERROR]\x1B[0m", sendErr);

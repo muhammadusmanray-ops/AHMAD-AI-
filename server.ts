@@ -645,27 +645,14 @@ async function startServer() {
               const activeSession = liveSession || (liveSessionPromise ? await liveSessionPromise : null);
               if (activeSession) {
                 // Send audio chunk to Gemini Multimodal Live API
-                try {
-                  activeSession.sendRealtimeInput({
-                    media: {
+                activeSession.sendRealtimeInput({
+                  mediaChunks: [
+                    {
                       data: audioBase64,
                       mimeType: "audio/pcm;rate=16000",
                     },
-                  });
-                } catch (e1) {
-                  if (typeof (activeSession as any).send === "function") {
-                    (activeSession as any).send({
-                      realtimeInput: {
-                        mediaChunks: [
-                          {
-                            data: audioBase64,
-                            mimeType: "audio/pcm;rate=16000",
-                          },
-                        ],
-                      },
-                    });
-                  }
-                }
+                  ],
+                });
               }
             } catch (sendErr) {
               console.error("\x1b[31m[CMD AUDIO ERROR]\x1b[0m", sendErr);
